@@ -2,9 +2,11 @@ package com.example.macbook.criminalintent;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
 import com.example.macbook.criminalintent.database.CrimeBaseHelper;
+import com.example.macbook.criminalintent.database.CrimeCursorWrapper;
 import com.example.macbook.criminalintent.database.CrimeDbSchema;
 import com.example.macbook.criminalintent.database.CrimeDbSchema.CrimeTable;
 
@@ -41,11 +43,56 @@ public class CrimeLab {
         mDatabase.insert(CrimeTable.NAME, null, values);
 
     }
-    public List<Crime> getCrimes() {
-        return new ArrayList<>();
+    private CrimeCursorWrapper queryCrimes(String whereClause, String[] whereArgs) {
+        Cursor cursor = mDatabase.query(
+        CrimeTable.NAME,
+                null, // Columns - null selects all columns
+                whereClause,
+                whereArgs,
+                null, // groupBy
+                null, // having
+                null  // orderBy
+        );
+
+        return new CrimeCursorWrapper(cursor);
     }
+    public void updateCrime(Crime crime) {
+        String uuidString = crime.getId().toString();
+        ContentValues values = getContentValues(crime);
+        mDatabase.update(CrimeTable.NAME, values,
+                CrimeTable.Cols.UUID + " = ?",
+                new String[]{uuidString});
+    }
+    public List<Crime> getCrimes() {
+        List<Crime> crimes = new ArrayList<>();
+        CrimeCursorWrapper cursor = queryCrimes(null, null);
+        try {
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                crimes.add(cursor.getCrime());
+                cursor.moveToNext();
+            }
+        } finally {
+            cursor.close();
+        }
+        return crimes;
+    }
+
     public Crime getCrime(UUID id) {
-        return null;
+        CrimeCursorWrapper cursor = queryCrimes(
+                CrimeTable.Cols.UUID + " = ?",
+                new String[] { id.toString() }
+        );
+
+        try {
+            if (cursor.getCount() == 0) {
+                return null;
+            }
+            cursor.moveToFirst();
+            return cursor.getCrime();
+        } finally {
+            cursor.close();
+        }
     }
     private static ContentValues getContentValues(Crime crime) {
         ContentValues values = new ContentValues();
